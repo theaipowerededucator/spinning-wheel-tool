@@ -36,6 +36,7 @@
             justify-content: center;
             min-height: 100vh;
             padding: 20px;
+            overflow-x: hidden; /* Prevent horizontal scroll */
         }
 
         .title {
@@ -44,14 +45,14 @@
         }
 
         .title h1 {
-            font-size: 3rem;
+            font-size: 2.5rem; /* Slightly smaller on mobile */
             color: var(--text-color);
             text-transform: uppercase;
             text-shadow: 0 0 5px var(--primary-glow), 0 0 15px var(--primary-glow), 0 0 25px var(--primary-glow);
         }
 
         .title p {
-            font-size: 1.2rem;
+            font-size: 1rem; /* Slightly smaller on mobile */
             color: var(--secondary-glow);
             text-shadow: 0 0 5px var(--secondary-glow);
         }
@@ -61,7 +62,8 @@
             flex-wrap: wrap;
             justify-content: center;
             align-items: flex-start;
-            gap: 50px;
+            gap: 40px;
+            width: 100%;
         }
 
         /* --- Input Area --- */
@@ -71,7 +73,8 @@
             border-radius: 15px;
             padding: 25px;
             box-shadow: 0 0 20px var(--accent-glow), inset 0 0 10px var(--accent-glow);
-            width: 350px;
+            width: 100%;
+            max-width: 380px;
         }
 
         .options-container h2 {
@@ -168,12 +171,17 @@
             flex-direction: column;
             align-items: center;
             gap: 30px;
+            width: 100%;
+            max-width: 450px;
         }
 
         .wheel-wrapper {
             position: relative;
-            width: 450px;
-            height: 450px;
+            /* MODIFIED: Use responsive units */
+            width: 90vw;
+            height: 90vw;
+            max-width: 450px;
+            max-height: 450px;
         }
 
         .wheel-pointer {
@@ -194,6 +202,9 @@
             position: absolute;
             top: 0;
             left: 0;
+            /* MODIFIED: Canvas will be sized by JS, but this helps it fill the container */
+            width: 100%;
+            height: 100%;
         }
         
         .wheel-hub {
@@ -201,8 +212,10 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 80px;
-            height: 80px;
+            width: 18%; /* Use percentage for scaling */
+            height: 18%;
+            min-width: 40px;
+            min-height: 40px;
             background-image: radial-gradient(circle, #fff, var(--primary-glow));
             border-radius: 50%;
             border: 5px solid #fff;
@@ -212,7 +225,8 @@
         #spin-btn {
             background: linear-gradient(145deg, var(--primary-glow), #0066ff);
             box-shadow: 0 0 15px var(--primary-glow);
-            width: 250px;
+            width: 100%;
+            max-width: 250px;
         }
 
         .winner-display {
@@ -220,7 +234,8 @@
             border: 2px solid var(--accent-glow);
             border-radius: 10px;
             padding: 15px 25px;
-            width: 450px;
+            /* MODIFIED: Use responsive width */
+            width: 100%;
             min-height: 60px;
             box-shadow: 0 0 15px var(--accent-glow);
             text-align: center;
@@ -273,7 +288,7 @@
         <div class="game-area">
             <div class="wheel-wrapper">
                 <div class="wheel-pointer"></div>
-                <canvas id="wheel-canvas" width="450" height="450"></canvas>
+                <canvas id="wheel-canvas"></canvas> <!-- Removed fixed width/height -->
                 <div class="wheel-hub"></div>
             </div>
             <button id="spin-btn" disabled>Spin The Wheel</button>
@@ -292,6 +307,7 @@
         const spinBtn = document.getElementById('spin-btn');
         const winnerText = document.getElementById('winner-text');
         const canvas = document.getElementById('wheel-canvas');
+        const wheelWrapper = document.querySelector('.wheel-wrapper');
         const ctx = canvas.getContext('2d');
 
         // --- Config & State ---
@@ -388,7 +404,16 @@
             return distribution;
         }
 
+        // NEW: Function to resize the canvas and redraw the wheel
+        function resizeCanvas() {
+            const size = wheelWrapper.clientWidth;
+            canvas.width = size;
+            canvas.height = size;
+            drawWheel();
+        }
+
         function drawWheel() {
+            if (canvas.width <= 0) return; // Don't draw if canvas has no size
             const sliceAngle = 360 / SLICE_COUNT;
             const radius = canvas.width / 2;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -403,7 +428,7 @@
                 // Draw slice
                 ctx.beginPath();
                 ctx.moveTo(0, 0);
-                ctx.arc(0, 0, radius, startAngle, endAngle);
+                ctx.arc(0, 0, radius - 2, startAngle, endAngle); // -2 to avoid stroke overlap
                 ctx.closePath();
                 ctx.fillStyle = wheelState.optionColorMap[option];
                 ctx.fill();
@@ -415,14 +440,14 @@
                 ctx.save();
                 ctx.rotate(startAngle + (sliceAngle * Math.PI / 180) / 2);
                 ctx.textAlign = 'center';
-                // **MODIFIED**: Vertically center the text on the slice
                 ctx.textBaseline = 'middle'; 
                 ctx.fillStyle = '#fff';
-                ctx.font = 'bold 16px Orbitron';
+                // Scale font size based on wheel size
+                const fontSize = Math.max(10, Math.floor(canvas.width / 28));
+                ctx.font = `bold ${fontSize}px Orbitron`;
                 ctx.shadowColor = '#000';
                 ctx.shadowBlur = 3;
-                // The 'y' coordinate is now 0 due to the middle baseline setting
-                ctx.fillText(option, radius * 0.65, 0); 
+                ctx.fillText(option, radius * 0.65, 0, radius * 0.6); // Added max width for text
                 ctx.restore();
             });
             ctx.restore();
@@ -472,6 +497,10 @@
                 inputManager.init();
                 this.submitOptions();
                 spinBtn.addEventListener('click', this.spinWheel);
+                // NEW: Add resize listener
+                window.addEventListener('resize', resizeCanvas);
+                // NEW: Initial resize
+                resizeCanvas();
             },
             submitOptions() {
                 wheelState.options = inputManager.getOptions();
